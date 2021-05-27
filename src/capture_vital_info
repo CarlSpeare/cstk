@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# check for /etc/backup directory
+[ -d /etc/backup ] || { /bin/mkdir /etc/backup ; echo "/etc/backup was missing, now created." ; }
+
+# grab our current timestamp
+TSTAMP=$( /bin/date -u "+%Y-%m-%dT%H%M%SZ" )
+
+# collect vital data
+OSTYPE=$( uname -s )
+
+case ${OSTYPE} in
+   Linux)
+      # some of these are RHEL-specific (or possibly RHEL-derived)
+      [ -x /sbin/chkconfig ]      &&  /sbin/chkconfig --list      | /bin/gzip   >  /etc/backup/chkconfig_list.${TSTAMP}.gz
+      [ -x /bin/rpm ]             &&  /bin/rpm --qa --last        | /bin/gzip   >  /etc/backup/rpm_list.${TSTAMP}.gz
+      # some of these are Debian-specific (or possibly Debian-derived)
+      [ -x /usr/bin/dpkg ]        &&  /usr/bin/dpkg -l            | /bin/gzip   >  /etc/backup/dpkg_list.${TSTAMP}.gz
+      # some guarded entries in case the tool doesn't exist
+      [ -x /sbin/service ]        &&  /sbin/service --status-all  |  /bin/gzip  >  /etc/backup/service_status.${TSTAMP}.gz
+      [ -x /sbin/lspci ]          &&  /sbin/lspci -vvv            |  /bin/gzip  >  /etc/backup/lspci_vvv.${TSTAMP}.gz
+      [ -x /usr/sbin/dmidecode ]  &&  /usr/sbin/dmidecode         |  /bin/gzip  >  /etc/backup/dmidecode.${TSTAMP}.gz
+      # all of these should be Linux-wide, regardless of flavour
+      /bin/cat /proc/mounts       |  /bin/gzip  >  /etc/backup/mounts.${TSTAMP}.gz
+      /bin/cat /proc/cmdline      |  /bin/gzip  >  /etc/backup/cmdline.${TSTAMP}.gz
+      /bin/cat /proc/cpuinfo      |  /bin/gzip  >  /etc/backup/cpuinfo.${TSTAMP}.gz
+      /bin/cat /proc/meminfo      |  /bin/gzip  >  /etc/backup/meminfo.${TSTAMP}.gz
+      /bin/cat /proc/modules      |  /bin/gzip  >  /etc/backup/modules.${TSTAMP}.gz
+      /bin/cat /proc/version      |  /bin/gzip  >  /etc/backup/version.${TSTAMP}.gz
+      /bin/netstat -nr            |  /bin/gzip  >  /etc/backup/routes.${TSTAMP}.gz
+      /sbin/ifconfig -a           |  /bin/gzip  >  /etc/backup/ifconfig.${TSTAMP}.gz
+      /sbin/sysctl -a             |  /bin/gzip  >  /etc/backup/sysctl.${TSTAMP}.gz
+      ;;
+   SunOS)
+      [ -x /bin/svcs ] && /bin/svcs -a  |  /bin/gzip  >  /etc/backup/service_status.${TSTAMP}.gz
+      /bin/pkginfo -l                   |  /bin/gzip  >  /etc/backup/pkginfo_list.${TSTAMP}.gz
+      /bin/showrev -p                   |  /bin/gzip  >  /etc/backup/showrev_p.${TSTAMP}.gz
+      /sbin/mount                       |  /bin/gzip  >  /etc/backup/mounts.${TSTAMP}.gz
+      /bin/netstat -nr                  |  /bin/gzip  >  /etc/backup/routes.${TSTAMP}.gz
+      /sbin/ifconfig -a                 |  /bin/gzip  >  /etc/backup/ifconfig.${TSTAMP}.gz
+      /usr/sbin/psrinfo -v              |  /bin/gzip  >  /etc/backup/psrinfo.${TSTAMP}.gz
+      /usr/sbin/prtdiag -v              |  /bin/gzip  >  /etc/backup/prtdiag.${TSTAMP}.gz
+      /usr/sbin/sysdef                  |  /bin/gzip  >  /etc/backup/sysdef.${TSTAMP}.gz
+      /usr/sbin/prtconf -pv             |  /bin/gzip  >  /etc/backup/prtconf_pv.${TSTAMP}.gz
+      /bin/cat /etc/system              |  /bin/gzip  >  /etc/backup/system.${TSTAMP}.gz
+      /bin/cat /etc/vfstab              |  /bin/gzip  >  /etc/backup/vfstab.${TSTAMP}.gz
+      /bin/cat /etc/name_to_major       |  /bin/gzip  >  /etc/backup/name_to_major.${TSTAMP}.gz
+      /bin/cat /etc/name_to_sysnum      |  /bin/gzip  >  /etc/backup/name_to_sysnum.${TSTAMP}.gz
+      ;;
+   Darwin)
+      /sbin/ifconfig -a           |  /usr/bin/gzip  >  /etc/backup/ifconfig.${TSTAMP}.gz
+      /usr/sbin/sysctl -a         |  /usr/bin/gzip  >  /etc/backup/sysctl.${TSTAMP}.gz
+      /usr/sbin/netstat -nr       |  /usr/bin/gzip  >  /etc/backup/routes.${TSTAMP}.gz
+      /usr/sbin/pkgutil --pkgs    |  /usr/bin/gzip  >  /etc/backup/pkgutil_pkgs.${TSTAMP}.gz
+      ;;
+   *)
+      echo "ABEND: do not know how to handle OS: ${OSTYPE}"
+      exit 1
+      ;;
+esac
+
+echo "Finished collecting vital info."
+
+# exit nicely
+exit 0

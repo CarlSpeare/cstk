@@ -1,0 +1,341 @@
+#!/bin/bash
+# ecfg version 0.6 configuration backup tool
+# by Carl Speare, Jan 2005.
+#
+# Be sure to read the comments further below on setup.
+# There isn't much required, but not doing the basics
+# will certainly lead to problems.
+#
+# command summary:
+#    ecfg <command> <hostname> 
+#
+# Revision history
+#
+#       Jan  13, 2005   Base version (0.1) 
+#                       All major functions implemented.
+#                       Basic error checking in place.
+#       Jan  14, 2005   Added hooks for OS-specific
+#                       scripts. Will look for a different
+#                       config file based upon how we are
+#                       called, and check if the remote
+#                       system is of the correct OS type.
+#       Jan  14, 2005   Auto-determine remote OS; added
+#                       some basic command checking. Also,
+#                       added some logic to handle non-
+#                       existent files on the remote host.
+#       Jan  18, 2005   Allow comments in config files.
+#       Jan  24, 2005   Changed the algorithm to be less
+#                       "thick" (i.e., avoid network access
+#                       as much as possible).
+#       Aug  16, 2006   Re-vamped the method ecfg uses to
+#                       snapshot hosts. Much more stable.
+#       Aug  23, 2006   Fixed some minor bugs, implemented
+#                       qcheck.
+#       May  22, 2013   Some cleanup and updating to reflect
+#                       modern standards.
+#	Apr  19, 2018	Minor fixes, and some better checks.
+#
+# Exit Codes:
+# 0  = (implied) success
+# 1  = root required
+# 2  = not enough space (very weak check, needs work)
+# 3  = host down or unreachable (may be obsolete)
+# 4  = no ssh or rsh to host
+# 5  = command-specific warning (needs work)
+# 6  = no repository or more than 1 day out of date ([q]check)
+# 7  = repository does not exist at all
+# 8  = non-zero exit on tar step
+# 9  = non-zero exit on kompressor step
+# 10 = non-supported system
+#
+# commands:
+#       initialise a host: init
+#       checkin changes  : update 
+#       look for diffs   : [q]check
+#       delete a host    : delete
+# hostname:
+#       any hostname; ping and ssh are used to contact it,
+#       so whatever ping and ssh do (usually library resolver)
+#       is what this script will do. Please take note.
+#
+# SETUP INSTRUCTIONS - PLEASE READ
+# Before using ecfg, you'll need to define a few basic things.
+# Most importantly, you'll need to define where you want to store the
+# backups that ecfg makes.  This is called "repository" and should be
+# an absolute path to where you want to store the data.  We provide a
+# sample value, but this is very likely not going to work without any
+# changes.
+# In the repository area, you will then need to create cfg directories
+# for each OS type you want to back up.  Examples would include
+# cfg-Linux and cfg-SunOS.  In each cfg directory, create a text file
+# called "items", which contains a list of items to copy.  You can
+# include comments in the "items" file.  You'll want to put ONE item
+# per line; directories and individual files are both acceptable, so
+# long as you include a trailing slash for directories.  Here are two
+# sample files for Linux and Solaris (cfg-Linux and cfg-SunOS):
+#
+# cfg-Linux/items:
+# /etc/
+# /var/spool/cron/
+# /boot/grub/grub.conf
+#
+# cfg-SunOS/items:
+# /etc/
+# /var/spool/cron/crontabs/
+# /kernel/drv/sd.conf
+#
+# Finally, in the repository area, you'd create a directory called
+# data.  A correctly setup repository area, in /repository, would
+# look like this:
+# /repository/data/
+# /repository/cfg-Linux/items
+# /repository/cfg-SunOS/items
+# The ecfg file itself (this file) can live anywhere convenient.
+# There are 3 sub-commands that are defined: tar_cmd (full path to a
+# GNU-style tar); df_cmd (full path to a GNU-style df so we can tell
+# if we have enough space); kompressor (full path to a recent version
+# of bzip2).  Note that we tar first, then compress separately.  This
+# does mean we take a bit more space than would otherwise be needed.
+# For the space check, we don't use an absolute value, but instead a
+# percentage (more than 90% used will fail).  This is probably not
+# foolproof, and there are probably better choices.
+# Here are the setup items you will need to update:
+
+repository="/repository/.ecfg"
+tar_cmd="/bin/tar"
+df_cmd="/bin/df"
+kompressor="/usr/bin/bzip2"
+
+###################################################
+# No changes should be necessary below this line. #
+###################################################
+# define
+version=0.6
+r_c=0
+
+# the only function we need up front - look for all other functions further down
+usage() {
+    printf "Usage:\n"
+    printf "\tecfg <command> <hostname>\n"
+    printf "where:\n"
+    printf "\tcommand is one of: init , update , [q]check , delete\n"
+    printf "\thostname is only ONE host\n\n"
+    exit ${r_c}
+}
+
+# grab assignments
+command="${1}"
+target_host="${2}"
+# check commands first, and exit immediately if they are wrong (even if we aren't root)
+if [ "x${command}" = "x" ]; then
+    printf "You need to specify a command, try 'ecfg help' if you are lost.\n"
+    r_c=5
+    exit ${r_c}
+fi
+case ${command} in
+    help)
+        usage
+        ;;
+    init)
+        ;;
+    check)
+        ;;
+    qcheck)
+        ;;
+    update)
+        ;;
+    delete)
+        ;;
+    *)
+        printf "Command \"${command}\" is not a valid command, or is not yet implemented.\n(Try running 'ecfg help' if you are lost.)\n\n"
+        r_c=5
+        exit ${r_c}
+        ;;
+esac
+
+# functions
+main() {
+    check_root
+    check_space
+    [ "x${command}" == "x" ] && usage
+    [ "x${target_host}" == "x" ] && usage
+    printf "ecfg ${version} - performing ${command} on ${target_host} \n"
+    ${command}
+    exit ${r_c}
+}
+
+check_space() {
+    [ -d ${repository} ] || { printf "ecfg error 7: repository does not exist at all.  Re-define it?\n" ; r_c=7 ; exit ${r_c} ; }
+    # set the initial capacity used to 99%, in case we mess up our check
+    # we automatically fail and exit
+    disk_capacity=99
+    disk_capacity=$( ${df_cmd} -k -P ${repository} | tail -1 | awk '{print $5}' | sed 's/\%//' )
+    if [ ${disk_capacity} -gt 90 ]; then
+        printf "ecfg error 2: not enough free space on device where ${repository} is held.\n"
+        r_c=2
+        exit ${r_c}
+    fi
+}
+
+init() {
+    check_host
+    determine_os
+    current_date=$( date +%Y%m%d-%H%M )
+    [ ! -d ${repository}/data/${target_host} ] && ( printf "Making host directory ${repository}/data/${target_host}: ... " ; mkdir ${repository}/data/${target_host} ; printf "Done.\n" )
+    [ ! -d ${repository}/data/${target_host}/${current_date} ] && ( printf "Making host-date directory ${repository}/data/${target_host}/${current_date}: ... " ; mkdir ${repository}/data/${target_host}/${current_date} ; printf "Done.\n" )
+    list_of_items=$( cat ${repository}/cfg-${remote_os}/items | grep -v "^#" )
+    printf "Making host structure: "
+    for each in ${list_of_items}
+    do
+        base_of_item=$( dirname ${each} )
+        [ ! -d ${repository}/data/${target_host}/${current_date}/${base_of_item} ] && ( mkdir -p ${repository}/data/${target_host}/${current_date}/${base_of_item}/ ; printf "\t...${target_host}${base_of_item} " )
+    done
+    printf "\t...Done.\n"
+    printf "Copying in files: "
+    for each in ${list_of_items}
+    do
+        ${rcopy} ${target_host}:${each} ${repository}/data/${target_host}/${current_date}/${each} > /dev/null 2>&1
+        if [ -e ${repository}/data/${target_host}/${current_date}/${each} ]; then 
+            printf "\t...${each}"
+        else
+            printf "\t...${each} does not exist on ${target_host}, seems like there might be a problem.\n"
+        fi
+    done
+    printf "\t...Done.\n"
+    printf "Compressing dated configuration... "
+    ${tar_cmd} -cf ${repository}/data/${target_host}/${current_date}.tar -C ${repository}/data/${target_host}/${current_date} .
+    [ $? -ne 0 ] && { rc=8 ; printf "ecfg error 8: tar had a non-zero exit, which is usually bad.  Exiting.\n" ; exit ${r_c} ; }
+    ${kompressor}  ${repository}/data/${target_host}/${current_date}.tar
+    [ $? -ne 0 ] && { rc=9 ; printf "ecfg error 9: bzip2 had a non-zero exit, which is usually bad.  Exiting.\n" ; exit ${r_c} ; }
+    rm -fr ${repository}/data/${target_host}/${current_date}
+    printf "\t...Done.\n"
+    printf "${target_host}: checkin completed successfully.\n"
+    r_c=0
+}
+
+update() {
+    # With the new version of ecfg, there is no difference between init and update.
+    init
+}
+
+check() {
+    # see if the host even has a repository entry
+    if [ ! -d ${repository}/data/${target_host}/ ]; then
+        printf "ecfg reports that host ${target_host} has no repository.\n"
+        printf "Please run 'init' on host ${target_host} first.\n"
+        r_c=5
+        exit ${r_c}
+    fi
+    # parse out the date of the last checkin
+    last_update=$( ls -1tr ${repository}/data/${target_host}/ | tail -1 | cut -d\. -f1 )
+    last_year=$( echo ${last_update} | cut -b1-4 )
+    last_month=$( echo ${last_update} | cut -b5-6 )
+    last_day=$( echo ${last_update} | cut -b7-8 )
+    last_hour=$( echo ${last_update} | cut -b10-11 )
+    last_minute=$( echo ${last_update} | cut -b12-13 )
+    printf "The last update on host ${target_host} was at ${last_hour}:${last_minute} on "
+    date +%a,\ %b\ %d\ %Y -d"$( echo ${last_year}${last_month}${last_day} )"
+    current_block=$( date +%Y%m%d )
+    last_block=$( echo ${last_update} | cut -b1-8 )
+    if [ ${current_block} -gt ${last_block} ]; then
+        printf "That was more than one day ago; you might want to consider running an update.\n"
+    fi
+}
+
+qcheck() {
+    # see if the host even has a repository entry
+    if [ ! -d $repository/data/$target_host/ ]; then
+        r_c=6
+        exit ${r_c}
+    fi
+    # parse out the date of the last checkin
+    last_update=$( ls -1tr ${repository}/data/${target_host}/ | tail -1 | cut -d\. -f1 )
+    last_year=$( echo ${last_update} | cut -b1-4 )
+    last_month=$( echo ${last_update} | cut -b5-6 )
+    last_day=$( echo ${last_update} | cut -b7-8 )
+    last_hour=$( echo ${last_update} | cut -b10-11 )
+    last_minute=$( echo ${last_update} | cut -b12-13 )
+    date +%a,\ %b\ %d\ %Y -d"$( echo ${last_year}${last_month}${last_day} )"
+    current_block=$( date +%Y%m%d )
+    last_block=$( echo $last_update | cut -b1-8 )
+    if [ ${current_block} -gt ${last_block} ]; then
+        r_c=6
+        exit ${r_c}
+    fi
+}
+
+delete() {
+    delete_check
+    printf "\n\n * * * WARNING * * * : deleting a host is DANGEROUS.\n\nAll history for that host is LOST FOREVER, unless it was backed up somewhere else.\n(Perhaps to tape or something even better.)\n\nAre you ABSOLUTELY SURE you want to COMPLETELY REMOVE the history for system ${target_host}?\n(You must type 'yes' (without the quotes) to continue!) -> "
+    read response
+    if [ ${response} = "yes" ]; then
+        printf "\nAbout to execute the following: "
+        printf "REMOVE ${target_host} from the repository\n"
+        printf "THIS IS YOUR FINAL CHANCE. You MUST enter 'yes' (without quotes) to perform this removal.\nYOU HAVE BEEN WARNED. Continue? ->"
+        read secondchance
+        if [ ${secondchance} = "yes" ]; then
+            rm -fr ${repository}/data/${target_host}
+            [ $? -eq 0 ] && printf "System ${target_host} has been removed from the repository.\n"
+        fi
+    fi
+}
+
+delete_check() {
+    if [ ! -d ${repository}/data/${target_host} ]; then
+        printf "\nSystem ${target_host} does not have a repository entry.\nCannot delete a non-existent host. Giving up ... \n\n"
+        r_c=5
+        exit ${r_c}
+    fi
+}
+
+check_root() {
+    # check my local OS name
+    local_os=$( uname )
+    # this also acts as a supported OS check
+    case ${local_os} in
+        SunOS)
+            my_id=$( /usr/xpg4/bin/id -u )
+            [ ${my_id} -ne 0 ] && { printf "You MUST be root to run this command.\n(Hint: try using sudo.)\n" ; exit 1 ; }
+            ;;
+        Linux|Darwin|NetBSD)
+            my_id=$( /usr/bin/id -u )
+            [ ${my_id} -ne 0 ] && { printf "You MUST be root to run this command.\n(Hint: try using sudo.)\n" ; exit 1 ; }
+            ;;
+        *)
+            printf "\n${local_os} is not a supported system yet.\n"
+            r_c=10
+            exit ${r_c}
+            ;;
+    esac
+}
+
+check_host() {
+    ping -c 2 ${target_host} > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Host ${target_host} is not reachle (by ping) or might be down."
+        echo "This might not be a problem, and we will try to connect via SSH."
+        ### previously, it was an error to be unreachable via ping.
+        ## r_c=3
+        ## exit ${r_c}
+    fi
+    ssh -o ConnectTimeout=15 ${target_host} true > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        rsh ${target_host} true > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            printf "Host does not answer to ssh or rsh. Giving up ... \n"
+            r_c=4
+            exit ${r_c}
+        fi
+        remote=rsh
+        rcopy="rsync -e rsh -av "
+    fi
+    remote=ssh
+    rcopy="rsync -e ssh -av "
+}
+
+determine_os() {
+    check_host
+    remote_os=$( ${remote} ${target_host} uname )
+}
+
+main

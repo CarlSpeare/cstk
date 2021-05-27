@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# cstk:iso8601 - generate timestamp in the spirit of ISO 8601 
+# If you receive an error message about the -u flag, you likely
+# are not running on a supported OS.  Darwin, Linux and NetBSD
+# all support the -u flag.  Any other error indicates that the
+# command "date" may be: aliased, a shell internal, or a file
+# that is in an improperly formed $PATH being picked up instead
+# of the official date command.
+
+DATEONLY=0
+THISTZ="-u"
+while getopts dl flags
+do
+	case $flags in
+		d) DATEONLY=1 ;;
+		l) THISTZ= ;;
+		h|?) printf "Usage: $0 [-d] [-l]\n" $0
+		     echo " -d: date only"
+		     echo " -l: local timezone, not UTC"
+		     exit 1;;
+	esac
+done
+
+if [ $DATEONLY -eq 1 ]; then
+	date $THISTZ "+%Y-%m-%d"
+else
+	date $THISTZ "+%Y-%m-%dT%H:%M:%SZ"
+fi
+
+# exit with the exit code from date, in case there was trouble.
+# (could there be with something this simple?)
+exit $?

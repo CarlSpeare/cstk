@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# cstk:enc - encrypt a file for safe storage using openssl
+# clearly this depends upon openssl being installed and in
+# the path.  if this is not the case, you are likely not
+# running a supported system.
+
+openssl des3 -salt -in ${1} -out des3.${1}
+if [ $? -eq 0 ]; then
+	rm -f ${1}
+	mv des3.${1} ${1}
+	chmod a-w ${1}
+	echo "${1} replaced with encrypted content."
+else
+	echo "Encryption failed, aborting operation."
+	exit 1
+fi
+
+exit 0

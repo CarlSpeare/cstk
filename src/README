@@ -1,0 +1,21 @@
+To install cstk, you'll want to run the "setup" script in this
+directory.  For this to function properly, you'll either need
+write access to the target directory (default is /opt/cstk),
+or you'll need sudo (or some other method of running setup as
+root) so you can write to the target location.
+
+Things you'll need:
+	- An ANSI C compiler in your $PATH, preferrable called
+	  cc.  If you need to point to a customer compiler, the
+	  environment variable COMPILER can be defined and we
+	  use that.
+	- A system that is either some type of Linux, NetBSD or
+	  Mac OS from 10.0 onwards.  Other variants will likely
+	  work (AIX, HP/UX and Solaris for example), but the
+	  original work is tested on Linux, NetBSD and Mac OS.
+	- A few megabytes of disk space for where you are going
+	  to install to, and a few more for where you are doing
+	  the compilation.
+
+Binary distributions exist for some Linux variants, NetBSD and
+Mac OS.
