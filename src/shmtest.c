@@ -24,9 +24,9 @@ int main(void)
         printf ("Allocated %ld bytes on segment id %d\n\n", maxsize, shmid);
         printf ("Waiting for you to enter a number and press enter to exit... ");
         scanf ("%ld", &maxsize);
-        shmdt(shmptr);
-        shmctl(shmid, IPC_RMID, 0);
+        shmdt (shmptr);
+        shmctl (shmid, IPC_RMID, 0);
         printf ("Done.\n");
-        return(0);
+        return (0);
 }
 /* end */
