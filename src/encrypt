@@ -5,11 +5,16 @@
 # the path.  if this is not the case, you are likely not
 # running a supported system.
 
-openssl des3 -salt -in ${1} -out des3.${1}
+if [ "x${1}" = "x" ]; then
+	echo "You need to supply a single argument, a file to encrypt."
+	exit 1
+fi
+
+openssl aes-256-cbc -salt -in "${1}" -out "${1}".encrypted
 if [ $? -eq 0 ]; then
-	rm -f ${1}
-	mv des3.${1} ${1}
-	chmod a-w ${1}
+	rm -f "${1}"
+	mv ${1}.encrypted "${1}"
+	chmod a-w "${1}"
 	echo "${1} replaced with encrypted content."
 else
 	echo "Encryption failed, aborting operation."
