@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Capture Vital Info: this script will copy key information into /etc/backup
+# The intent here is that ecfg(1) will pick up /etc, so pushing this info in
+# /etc means that you have a more complete view of the system.  It takes the
+# "running config" type information versus the "startup config" type data
+# already on-disk.
+
+# Establish the return code.
+r_c=0
+
+# Most of this information must be collected as root (for example, lspci -vvv
+# lacks a lot of data when run as a non-root user), so we will check on our
+# permissions.  Note that 'sudo' does the correct thing, so try that.
+[ ${EUID} -ne 0 ] && { echo "  NOTE: this script lacks sufficient access.  Data collection will likely fail." ; r_c=1 ; }
+
 # check for /etc/backup directory
 [ -d /etc/backup ] || { /bin/mkdir /etc/backup ; echo "/etc/backup was missing, now created." ; }
 
@@ -62,4 +76,4 @@ esac
 echo "Finished collecting vital info."
 
 # exit nicely
-exit 0
+exit ${r_c}
