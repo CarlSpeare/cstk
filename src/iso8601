@@ -8,9 +8,10 @@
 # that is in an improperly formed $PATH being picked up instead
 # of the official date command.
 
+r_c=0
 DATEONLY=0
 THISTZ="-u"
-while getopts dl flags
+while getopts dlh flags
 do
 	case $flags in
 		d) DATEONLY=1 ;;
@@ -22,12 +23,14 @@ do
 	esac
 done
 
-if [ $DATEONLY -eq 1 ]; then
-	date $THISTZ "+%Y-%m-%d"
+if [ ${DATEONLY} -eq 1 ]; then
+	date ${THISTZ} "+%Y-%m-%d"
+	rc=$?
 else
-	date $THISTZ "+%Y-%m-%dT%H:%M:%SZ"
+	date ${THISTZ} "+%Y-%m-%dT%H:%M:%SZ"
+	rc=$?
 fi
 
 # exit with the exit code from date, in case there was trouble.
 # (could there be with something this simple?)
-exit $?
+exit ${r_c}
