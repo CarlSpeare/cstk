@@ -1,10 +1,11 @@
 #!/bin/bash
-# ecfg version 0.6 configuration backup tool
+# ecfg version 0.6.1 configuration backup tool
 # by Carl Speare, Jan 2005.
 #
 # Be sure to read the comments further below on setup.
 # There isn't much required, but not doing the basics
-# will certainly lead to problems.
+# will certainly lead to problems.  This script does
+# require some initial configuration to be usable.
 #
 # command summary:
 #    ecfg <command> <hostname> 
@@ -34,6 +35,7 @@
 #       May  22, 2013   Some cleanup and updating to reflect
 #                       modern standards.
 #	Apr  19, 2018	Minor fixes, and some better checks.
+#	May  27, 2021 	Small changes to formatting.
 #
 # Exit Codes:
 # 0  = (implied) success
@@ -58,7 +60,9 @@
 #       so whatever ping and ssh do (usually library resolver)
 #       is what this script will do. Please take note.
 #
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # SETUP INSTRUCTIONS - PLEASE READ
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Before using ecfg, you'll need to define a few basic things.
 # Most importantly, you'll need to define where you want to store the
 # backups that ecfg makes.  This is called "repository" and should be
@@ -110,7 +114,7 @@ kompressor="/usr/bin/bzip2"
 # No changes should be necessary below this line. #
 ###################################################
 # define
-version=0.6
+version=0.6.1
 r_c=0
 
 # the only function we need up front - look for all other functions further down
@@ -170,6 +174,7 @@ check_space() {
     # we automatically fail and exit
     disk_capacity=99
     disk_capacity=$( ${df_cmd} -k -P ${repository} | tail -1 | awk '{print $5}' | sed 's/\%//' )
+    # note that on Darwin, -P in df is not the same as on Linux, but in this case is not harmful to us.
     if [ ${disk_capacity} -gt 90 ]; then
         printf "ecfg error 2: not enough free space on device where ${repository} is held.\n"
         r_c=2
@@ -244,7 +249,7 @@ check() {
 
 qcheck() {
     # see if the host even has a repository entry
-    if [ ! -d $repository/data/$target_host/ ]; then
+    if [ ! -d ${repository}/data/${target_host}/ ]; then
         r_c=6
         exit ${r_c}
     fi
@@ -257,7 +262,7 @@ qcheck() {
     last_minute=$( echo ${last_update} | cut -b12-13 )
     date +%a,\ %b\ %d\ %Y -d"$( echo ${last_year}${last_month}${last_day} )"
     current_block=$( date +%Y%m%d )
-    last_block=$( echo $last_update | cut -b1-8 )
+    last_block=$( echo ${last_update} | cut -b1-8 )
     if [ ${current_block} -gt ${last_block} ]; then
         r_c=6
         exit ${r_c}
