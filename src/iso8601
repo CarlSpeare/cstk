@@ -11,6 +11,7 @@
 r_c=0
 DATEONLY=0
 THISTZ="-u"
+ZULU="Z"
 while getopts dlh flags
 do
 	case $flags in
@@ -23,11 +24,13 @@ do
 	esac
 done
 
+[ -z ${THISTZ} ] && ZULU=""
+
 if [ ${DATEONLY} -eq 1 ]; then
 	date ${THISTZ} "+%Y-%m-%d"
 	rc=$?
 else
-	date ${THISTZ} "+%Y-%m-%dT%H:%M:%SZ"
+	date ${THISTZ} "+%Y-%m-%dT%H:%M:%S${ZULU}"
 	rc=$?
 fi
 

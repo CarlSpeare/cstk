@@ -15,7 +15,7 @@ r_c=0
 [ ${EUID} -ne 0 ] && { echo "  NOTE: this script lacks sufficient access.  Data collection will likely fail." ; r_c=1 ; }
 
 # check for /etc/backup directory
-[ -d /etc/backup ] || { /bin/mkdir /etc/backup ; echo "/etc/backup was missing, now created." ; }
+[ -d /etc/backup ] || { /bin/mkdir /etc/backup && echo "/etc/backup was missing, now created." ; }
 
 # grab our current timestamp
 TSTAMP=$( /bin/date -u "+%Y-%m-%dT%H%M%SZ" )
