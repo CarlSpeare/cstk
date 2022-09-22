@@ -26,14 +26,19 @@ OSTYPE=$( uname -s )
 case ${OSTYPE} in
    Linux)
       # some of these are RHEL-specific (or possibly RHEL-derived)
-      [ -x /sbin/chkconfig ]      &&  /sbin/chkconfig --list      | /bin/gzip   >  /etc/backup/chkconfig_list.${TSTAMP}.gz
-      [ -x /bin/rpm ]             &&  /bin/rpm --qa --last        | /bin/gzip   >  /etc/backup/rpm_list.${TSTAMP}.gz
+      [ -x /sbin/chkconfig ]      &&  /sbin/chkconfig --list        | /bin/gzip   >  /etc/backup/chkconfig_list.${TSTAMP}.gz
+      [ -x /bin/rpm ]             &&  /bin/rpm --qa --last          | /bin/gzip   >  /etc/backup/rpm_list.${TSTAMP}.gz
       # some of these are Debian-specific (or possibly Debian-derived)
-      [ -x /usr/bin/dpkg ]        &&  /usr/bin/dpkg -l            | /bin/gzip   >  /etc/backup/dpkg_list.${TSTAMP}.gz
+      [ -x /usr/bin/dpkg ]        &&  /usr/bin/dpkg -l              | /bin/gzip   >  /etc/backup/dpkg_list.${TSTAMP}.gz
       # some guarded entries in case the tool doesn't exist
-      [ -x /sbin/service ]        &&  /sbin/service --status-all  |  /bin/gzip  >  /etc/backup/service_status.${TSTAMP}.gz
-      [ -x /sbin/lspci ]          &&  /sbin/lspci -vvv            |  /bin/gzip  >  /etc/backup/lspci_vvv.${TSTAMP}.gz
-      [ -x /usr/sbin/dmidecode ]  &&  /usr/sbin/dmidecode         |  /bin/gzip  >  /etc/backup/dmidecode.${TSTAMP}.gz
+      [ -x /bin/netstat ]         &&  /bin/netstat -nr              |  /bin/gzip  >  /etc/backup/netstat_nr.${TSTAMP}.gz
+      [ -x /sbin/ip ]             &&  /sibn/ip route list           |  /bin/gzip  >  /etc/backup/ip_route_list.${TSTAMP}.gz
+      [ -x /sbin/ifconfig ]       &&  /sbin/ifconfig -a             |  /bin/gzip  >  /etc/backup/ifconfig_a.${TSTAMP}.gz
+      [ -x /usr/bin/systemctl ]   &&  /usr/bin/systemctl -a --plain |  /bin/gzip  >  /etc/backup/systemctl_a.${TSTAMP}.gz
+      [ -x /usr/bin/systemctl ]   &&  /usr/bin/systemctl list-unit-files  |  /bin/gzip  >  /etc/backup/systemctl_list_unit_files.${TSTAMP}.gz
+      [ -x /sbin/service ]        &&  /sbin/service --status-all    |  /bin/gzip  >  /etc/backup/service_status.${TSTAMP}.gz
+      [ -x /sbin/lspci ]          &&  /sbin/lspci -vvv              |  /bin/gzip  >  /etc/backup/lspci_vvv.${TSTAMP}.gz
+      [ -x /usr/sbin/dmidecode ]  &&  /usr/sbin/dmidecode           |  /bin/gzip  >  /etc/backup/dmidecode.${TSTAMP}.gz
       # all of these should be Linux-wide, regardless of flavour
       /bin/cat /proc/mounts       |  /bin/gzip  >  /etc/backup/mounts.${TSTAMP}.gz
       /bin/cat /proc/cmdline      |  /bin/gzip  >  /etc/backup/cmdline.${TSTAMP}.gz
@@ -41,8 +46,6 @@ case ${OSTYPE} in
       /bin/cat /proc/meminfo      |  /bin/gzip  >  /etc/backup/meminfo.${TSTAMP}.gz
       /bin/cat /proc/modules      |  /bin/gzip  >  /etc/backup/modules.${TSTAMP}.gz
       /bin/cat /proc/version      |  /bin/gzip  >  /etc/backup/version.${TSTAMP}.gz
-      /bin/netstat -nr            |  /bin/gzip  >  /etc/backup/routes.${TSTAMP}.gz
-      /sbin/ifconfig -a           |  /bin/gzip  >  /etc/backup/ifconfig.${TSTAMP}.gz
       /sbin/sysctl -a             |  /bin/gzip  >  /etc/backup/sysctl.${TSTAMP}.gz
       ;;
    SunOS)
