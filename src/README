@@ -1,21 +1,24 @@
-To install cstk, you'll want to run the "setup" script in this
-directory.  For this to function properly, you'll either need
-write access to the target directory (default is /opt/cstk),
-or you'll need sudo (or some other method of running setup as
-root) so you can write to the target location.
+There are a few scripts here that are still marginally useful today.
 
-Things you'll need:
-	- An ANSI C compiler in your $PATH, preferrable called
-	  cc.  If you need to point to a customer compiler, the
-	  environment variable COMPILER can be defined and we
-	  use that.
-	- A system that is either some type of Linux, NetBSD or
-	  Mac OS from 10.0 onwards.  Other variants will likely
-	  work (AIX, HP/UX and Solaris for example), but the
-	  original work is tested on Linux, NetBSD and Mac OS.
-	- A few megabytes of disk space for where you are going
-	  to install to, and a few more for where you are doing
-	  the compilation.
+The capture_vital_info and ecfg pairing:
+ - capture_vital_info: this copies useful information into /etc/backup (by default).
+ - ecfg: this grabs useful information from remote systems and copies it locally.
+These are meant to be used in tandem to make system recovery easier.  The information
+that capture_vital_info shoves into /etc/backup can resurrect a lot of what a system
+looked like; paired with what ecfg will normally grab (assuming you use the config
+noted in the comments) means you can recover the basic personality of a system - BUT
+NOT THE DATA.  Grabbing /etc/ gives you a lot; grabbing /etc/, crontabs and the info
+in /boot gives you a huge amount.  Assuming that you have user data elsewhere, the
+info provided by capture_vital_info will tell you what software was installed via
+dpkg/rpm so you can re-install applications, what services were running, what mounts
+were active, networking information, etc.
 
-Binary distributions exist for some Linux variants, NetBSD and
-Mac OS.
+encrypt/decrypt use OpenSSL to make a command-line encryption/decryption pairing for
+local use.  The intent here is that we encrypt everything sensitive when not in use,
+backup the system, and then decrypt as necessary.
+
+The less useful tools:
+ - iso8601: 'date -Iseconds' should do the same thing.
+ - epoch2date: modern date can also convert epoch to human-readable times.
+ - shmtest.c: we all miss Chuck, and it's pretty rare that we need this to test shared
+   memory, but sometimes it does come in handy.
